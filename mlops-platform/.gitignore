@@ -8,10 +8,9 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
-mlops-platform/ml/models/current/model.pkl
-mlops-platform/ml/models/
-mlops-platform/ml/data/stream/
-mlops-platform/ml/reports/
+ml/models/
+ml/data/stream/
+ml/reports/
 
 airflow/logs/
 airflow/airflow.db
