@@ -13,6 +13,7 @@ const nav = [
   { href: "/drift", label: "Drift", icon: Waves }
 ];
 
+/** Left-side navigation for the dashboard. */
 export default function Sidebar() {
   const pathname = usePathname();
 

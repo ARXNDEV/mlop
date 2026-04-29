@@ -1,3 +1,6 @@
+"""Synthetic streaming data generator with gradual drift."""
+
+import logging
 import argparse
 import shutil
 import sys
@@ -8,6 +11,8 @@ import pandas as pd
 
 from ml.train import generate_dataset
 
+
+logger = logging.getLogger(__name__)
 
 STREAM_DIR = Path(__file__).resolve().parent / "data" / "stream"
 

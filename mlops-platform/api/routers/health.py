@@ -1,9 +1,14 @@
+"""Health check endpoint for the FastAPI service."""
+
+import logging
 import time
 
 from fastapi import APIRouter, Request
 
 from models.schemas import HealthResponse
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
 

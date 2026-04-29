@@ -1,11 +1,15 @@
 import os
 import sys
 from pathlib import Path
+from typing import AsyncIterator
+from unittest.mock import MagicMock
 
+import fakeredis
+import numpy as np
+import pandas as pd
 import pytest
-from httpx import ASGITransport, AsyncClient
 import pytest_asyncio
-
+from httpx import ASGITransport, AsyncClient
 
 ROOT = Path(__file__).resolve().parents[1]
 API_DIR = ROOT / "api"
@@ -16,47 +20,77 @@ sys.path.insert(0, str(ML_DIR))
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _test_env():
-    os.environ.setdefault("MODEL_NAME", "income-classifier")
-    os.environ.setdefault("AB_SPLIT_PERCENT", "20")
-    os.environ.setdefault("DRIFT_THRESHOLD", "0.15")
-    os.environ.setdefault("MLFLOW_TRACKING_URI", "http://127.0.0.1:5999")
-    os.environ.setdefault("MLFLOW_EXPERIMENT_NAME", "mlops-platform")
-    os.environ.setdefault("SKIP_REGISTRY_LOAD", "1")
-    os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "0")
-    yield
+def _test_env() -> None:
+    os.environ["MODEL_NAME"] = "income-classifier"
+    os.environ["AB_SPLIT_PERCENT"] = "20"
+    os.environ["DRIFT_THRESHOLD"] = "0.15"
+    os.environ["MLFLOW_TRACKING_URI"] = "http://127.0.0.1:5999"
+    os.environ["MLFLOW_EXPERIMENT_NAME"] = "mlops-platform"
+    os.environ["SKIP_REGISTRY_LOAD"] = "1"
+    os.environ["MLFLOW_HTTP_REQUEST_MAX_RETRIES"] = "0"
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _ensure_local_model():
-    from sklearn.ensemble import RandomForestClassifier
+@pytest.fixture
+def mock_model_v1() -> MagicMock:
+    m = MagicMock()
+    m.predict.return_value = np.array([0])
+    m.predict_proba.return_value = np.array([[0.8, 0.2]])
+    return m
 
-    from ml.train import generate_dataset, split_dataset
 
-    df = generate_dataset(n_samples=800, random_state=42)
-    train_df, _, _ = split_dataset(df, random_state=42)
-    x_train = train_df.drop(columns=["target"]).to_numpy()
-    y_train = train_df["target"].to_numpy()
+@pytest.fixture
+def mock_model_v2() -> MagicMock:
+    m = MagicMock()
+    m.predict.return_value = np.array([1])
+    m.predict_proba.return_value = np.array([[0.3, 0.7]])
+    return m
 
-    model = RandomForestClassifier(n_estimators=10, random_state=42)
-    model.fit(x_train, y_train)
 
-    out = ML_DIR / "models" / "current" / "model.pkl"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    import pandas as pd
+@pytest.fixture
+def sample_predict_request() -> dict:
+    return {"features": [0.1] * 10, "user_id": "test-user", "return_proba": False}
 
-    pd.to_pickle(model, out)
-    return out
+
+@pytest.fixture
+def redis_mock():
+    return fakeredis.FakeRedis(decode_responses=True)
+
+
+@pytest.fixture
+def reference_df() -> pd.DataFrame:
+    rng = np.random.default_rng(42)
+    x = rng.normal(loc=0.0, scale=1.0, size=(100, 10))
+    df = pd.DataFrame(x, columns=[f"f{i}" for i in range(10)])
+    df["target"] = rng.integers(0, 2, size=(100,))
+    return df
+
+
+@pytest.fixture
+def current_df_drifted() -> pd.DataFrame:
+    rng = np.random.default_rng(7)
+    x = rng.normal(loc=1.5, scale=1.0, size=(100, 10))
+    df = pd.DataFrame(x, columns=[f"f{i}" for i in range(10)])
+    df["target"] = rng.integers(0, 2, size=(100,))
+    return df
 
 
 @pytest_asyncio.fixture
-async def async_client():
+async def client(
+    mock_model_v1: MagicMock, mock_model_v2: MagicMock, redis_mock
+) -> AsyncIterator[AsyncClient]:
     from main import app
 
     await app.router.startup()
-    client = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+    app.state.model_manager.models = {"v1": mock_model_v1, "v2": mock_model_v2}
+    app.state.models = app.state.model_manager.models
+    app.state.ab_tracker.redis = redis_mock
+    app.state.drift_state = {"history": [], "features": {}, "latest_report_path": None}
+    app.state.retrain_events = []
+
+    ac = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
     try:
-        yield client
+        yield ac
     finally:
-        await client.aclose()
+        await ac.aclose()
         await app.router.shutdown()

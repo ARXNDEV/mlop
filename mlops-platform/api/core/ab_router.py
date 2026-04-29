@@ -1,3 +1,6 @@
+"""Deterministic A/B routing and Redis-backed A/B aggregation."""
+
+import logging
 import hashlib
 import os
 from datetime import datetime, timezone
@@ -9,6 +12,8 @@ from scipy.stats import ttest_ind
 
 from models.schemas import ABTestSummary
 
+
+logger = logging.getLogger(__name__)
 
 def route_request(user_id: str, split_percent: int) -> str:
     h = hashlib.md5(user_id.encode("utf-8")).hexdigest()
@@ -90,7 +95,11 @@ class _InMemoryRedis:
 
 
 class ABTestTracker:
-    def __init__(self, redis_url: Optional[str] = None) -> None:
+    def __init__(self, redis_url: Optional[str] = None, redis_client=None) -> None:
+        if redis_client is not None:
+            self.redis = redis_client
+            return
+
         url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379")
         try:
             r = redis.Redis.from_url(url, decode_responses=True)

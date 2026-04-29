@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 
 import { Moon, Sun } from "lucide-react";
 
+/** Top navigation bar with a theme toggle. */
 export default function Navbar() {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";

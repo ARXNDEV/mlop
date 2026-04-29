@@ -1,3 +1,6 @@
+"""Airflow DAG for retraining, evaluating, registering, and promoting models."""
+
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,6 +13,8 @@ from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.utils.task_group import TaskGroup
 
+
+logger = logging.getLogger(__name__)
 
 def _env(name: str, default: str | None = None) -> str | None:
     v = os.getenv(name)
@@ -204,6 +209,18 @@ def notify_completion(ti) -> None:
             if ti.xcom_pull(task_ids="register_and_promote.promote_to_production") is not None
             else "kept_production"
         )
+        try:
+            event_url = (
+                _env("API_RETRAIN_EVENT_URL", "http://api:8000/admin/retrain-event")
+                or "http://api:8000/admin/retrain-event"
+            )
+            requests.post(
+                event_url,
+                json={"reason": f"retrain_pipeline_completed:{decision}", "run_id": run_id},
+                timeout=10,
+            )
+        except Exception:
+            pass
         print(
             {
                 "model_name": model_name,

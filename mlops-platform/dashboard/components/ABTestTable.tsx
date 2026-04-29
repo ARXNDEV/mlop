@@ -4,15 +4,23 @@ import clsx from "clsx";
 
 import type { ABTestSummary } from "@/lib/types";
 
+/** Compact A/B comparison table for overview dashboards. */
 export default function ABTestTable({
   v1,
-  v2,
-  winner
+  v2
 }: {
   v1: ABTestSummary | null;
   v2: ABTestSummary | null;
-  winner: { winner: string; p_value: number | null } | null;
 }) {
+  const p = v1?.p_value ?? v2?.p_value ?? null;
+  const significant = p != null && p < 0.05;
+  const winner =
+    significant && v1?.accuracy != null && v2?.accuracy != null
+      ? v2.accuracy > v1.accuracy
+        ? "v2"
+        : "v1"
+      : "inconclusive";
+
   const rows = [
     {
       label: "Requests",
@@ -44,16 +52,16 @@ export default function ABTestTable({
           Winner:{" "}
           <span
             className={clsx("font-medium", {
-              "text-emerald-300": winner?.winner === "v2",
-              "text-sky-300": winner?.winner === "v1",
-              "text-zinc-400": winner?.winner === "inconclusive"
+              "text-emerald-300": winner === "v2",
+              "text-sky-300": winner === "v1",
+              "text-zinc-400": winner === "inconclusive"
             })}
           >
-            {winner?.winner ?? "—"}
+            {winner}
           </span>
-          {winner?.p_value == null ? null : (
+          {p == null ? null : (
             <span className="ml-2 text-zinc-500">
-              p={winner.p_value.toFixed(4)}
+              p={p.toFixed(4)}
             </span>
           )}
         </div>

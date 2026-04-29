@@ -4,17 +4,18 @@ import { Fragment, useMemo, useState } from "react";
 
 import clsx from "clsx";
 
-import type { MlflowRun } from "@/lib/types";
+import type { Experiment } from "@/lib/types";
 
 type SortKey = "start_time" | "status" | "accuracy" | "f1_score" | "roc_auc";
 
-function metric(run: MlflowRun, key: string): number {
+function metric(run: Experiment, key: string): number {
   const v = run.metrics[key];
   if (v == null) return Number.NEGATIVE_INFINITY;
   return v;
 }
 
-export default function ExperimentsTable({ runs }: { runs: MlflowRun[] }) {
+/** MLflow runs table with sorting, expandable details, and a 2-run comparison view. */
+export default function ExperimentsTable({ runs }: { runs: Experiment[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("start_time");

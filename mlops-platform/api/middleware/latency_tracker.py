@@ -1,3 +1,5 @@
+"""ASGI middleware for request IDs, latency tracking, and Prometheus metrics."""
+
 import logging
 import time
 from uuid import uuid4
@@ -9,7 +11,7 @@ from starlette.responses import Response
 from routers.metrics_router import http_request_duration_ms, http_requests_total
 
 
-logger = logging.getLogger("mlops.api")
+logger = logging.getLogger(__name__)
 
 
 class LatencyTrackerMiddleware(BaseHTTPMiddleware):

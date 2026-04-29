@@ -1,3 +1,6 @@
+"""Model loading utilities for MLflow registry and local fallbacks."""
+
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -7,6 +10,8 @@ import mlflow.sklearn
 import pandas as pd
 from mlflow.tracking import MlflowClient
 
+
+logger = logging.getLogger(__name__)
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     v = os.getenv(name)

@@ -27,6 +27,22 @@ services:
     networks:
       - mlops-network
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    env_file: .env
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9187/metrics || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    networks:
+      - mlops-network
+
   redis:
     image: redis:7-alpine
     healthcheck:

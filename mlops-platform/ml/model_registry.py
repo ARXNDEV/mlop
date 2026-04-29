@@ -1,3 +1,6 @@
+"""MLflow model registry helpers for registration and staged promotion."""
+
+import logging
 import os
 from typing import Any, Optional
 
@@ -6,6 +9,8 @@ import mlflow.sklearn
 from mlflow.entities.model_registry import ModelVersion
 from mlflow.tracking import MlflowClient
 
+
+logger = logging.getLogger(__name__)
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     v = os.getenv(name)

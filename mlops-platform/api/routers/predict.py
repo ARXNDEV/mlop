@@ -1,15 +1,20 @@
+"""Prediction endpoints (single, forced version, and batch)."""
+
+import logging
 import asyncio
 import time
 from typing import Optional
 from uuid import UUID, uuid4
 
 import numpy as np
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from core.ab_router import ABTestTracker, route_request
 from models.schemas import PredictRequest, PredictResponse
 from routers.metrics_router import prediction_confidence, prediction_requests_total
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["predict"])
 
@@ -70,6 +75,6 @@ async def predict_v2(request: Request, payload: PredictRequest) -> PredictRespon
 @router.post("/predict/batch", response_model=list[PredictResponse])
 async def predict_batch(request: Request, payloads: list[PredictRequest]) -> list[PredictResponse]:
     if len(payloads) > 100:
-        raise ValueError("batch size exceeds max=100")
+        raise HTTPException(status_code=422, detail="batch size exceeds max=100")
     tasks = [_predict_one(request, p, forced_version=None) for p in payloads]
     return await asyncio.gather(*tasks)

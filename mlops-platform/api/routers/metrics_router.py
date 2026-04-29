@@ -1,11 +1,19 @@
+"""Prometheus scrape endpoint and dashboard-friendly metric APIs."""
+
 from __future__ import annotations
 
-from typing import Any
+import logging
+import time
+from pathlib import Path
+from typing import Any, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, Info, generate_latest
 from prometheus_client.registry import REGISTRY
 from starlette.responses import Response
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_or_create(name: str, factory):
@@ -67,6 +75,11 @@ prediction_confidence: Histogram = _get_or_create(
         labelnames=["model_version"],
         buckets=(0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 0.95, 1.0),
     ),
+)
+
+retrain_events_total: Counter = _get_or_create(
+    "retrain_events_total",
+    lambda: Counter("retrain_events_total", "Retrain events total", labelnames=["reason"]),
 )
 
 
@@ -134,3 +147,98 @@ def metrics_summary() -> dict[str, Any]:
         "ab_split_percent": float(split),
         "active_model_version": active_info,
     }
+
+
+def _drift_state(request: Request) -> dict[str, Any]:
+    state = getattr(request.app, "state", None)
+    if not state:
+        return {"history": [], "features": {}, "latest_report_path": None}
+    ds = getattr(state, "drift_state", None)
+    if not isinstance(ds, dict):
+        return {"history": [], "features": {}, "latest_report_path": None}
+    ds.setdefault("history", [])
+    ds.setdefault("features", {})
+    ds.setdefault("latest_report_path", None)
+    return ds
+
+
+def _retrain_events(request: Request) -> list[dict[str, Any]]:
+    state = getattr(request.app, "state", None)
+    events = getattr(state, "retrain_events", None) if state else None
+    if not isinstance(events, list):
+        return []
+    return events
+
+
+@router.get("/metrics/drift/history")
+def drift_history(request: Request, hours: int = 24) -> list[dict[str, Any]]:
+    if hours <= 0 or hours > 24 * 30:
+        raise HTTPException(status_code=422, detail="hours must be within (0, 720]")
+
+    ds = _drift_state(request)
+    now_ms = int(time.time() * 1000)
+    cutoff = now_ms - int(hours) * 3600 * 1000
+    history: list[tuple[int, float]] = ds.get("history", [])
+
+    out: list[dict[str, Any]] = []
+    for ts, score in history:
+        if ts >= cutoff:
+            out.append({"timestamp": int(ts), "drift_score": float(score)})
+    return out
+
+
+@router.get("/metrics/drift/features")
+def drift_features(request: Request) -> list[dict[str, Any]]:
+    ds = _drift_state(request)
+    features: dict[str, dict[str, Any]] = ds.get("features", {})
+    out: list[dict[str, Any]] = []
+    for name, info in features.items():
+        out.append(
+            {
+                "feature": str(name),
+                "psi": float(info.get("psi", 0.0)),
+                "drift_detected": bool(info.get("drift_detected", False)),
+                "trend": list(info.get("trend", [])),
+            }
+        )
+    out.sort(key=lambda x: float(x["psi"]), reverse=True)
+    return out
+
+
+@router.get("/metrics/retrain/events")
+def retrain_events(request: Request) -> list[dict[str, Any]]:
+    return _retrain_events(request)[:5]
+
+
+@router.get("/metrics/drift/report/latest", include_in_schema=False)
+def latest_drift_report(request: Request) -> Response:
+    ds = _drift_state(request)
+    p: Optional[str] = ds.get("latest_report_path")
+
+    candidate_paths: list[Path] = []
+    if p:
+        candidate_paths.append(Path(p))
+    candidate_paths.append(Path("/app/ml/reports"))
+    candidate_paths.append(Path(__file__).resolve().parents[2] / "ml" / "reports")
+
+    html_path: Optional[Path] = None
+    for base in candidate_paths:
+        if base.is_dir():
+            files = sorted(base.glob("drift_*.html"))
+            if files:
+                html_path = files[-1]
+                break
+        elif base.is_file() and base.suffix == ".html":
+            html_path = base
+            break
+
+    if not html_path or not html_path.exists():
+        raise HTTPException(status_code=404, detail="No drift report available")
+
+    try:
+        html = html_path.read_text(encoding="utf-8")
+    except Exception as e:
+        logger.exception("drift_report_read_failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return Response(content=html, media_type="text/html")

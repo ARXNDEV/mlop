@@ -3,11 +3,20 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: prometheus
-    static_configs:
-      - targets: ["prometheus:9090"]
-
-  - job_name: api
+  - job_name: mlops-api
     metrics_path: /metrics
     static_configs:
       - targets: ["api:8000"]
+
+  - job_name: airflow
+    metrics_path: /admin/metrics
+    static_configs:
+      - targets: ["airflow-webserver:8080"]
+
+  - job_name: postgres-exporter
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]

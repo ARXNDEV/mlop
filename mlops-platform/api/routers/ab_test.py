@@ -1,15 +1,24 @@
+"""A/B test management endpoints backed by Redis."""
+
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from core.ab_router import ABTestTracker
 from models.schemas import ABTestSummary
 from routers.metrics_router import ab_split_percent
 
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/ab-test", tags=["ab-test"])
+
+class SplitUpdateRequest(BaseModel):
+    split_percent: int = Field(ge=0, le=100)
 
 
 @router.get("/summary", response_model=list[ABTestSummary])
@@ -39,14 +48,16 @@ def reset(request: Request) -> dict:
 @router.post("/split")
 def set_split(
     request: Request,
-    body: dict = Body(...),
+    body: SplitUpdateRequest,
 ) -> dict:
-    split_percent = int(body.get("split_percent", 0))
-    if split_percent < 0 or split_percent > 100:
-        raise ValueError("split_percent must be between 0 and 100")
-    request.app.state.ab_split_percent = split_percent
-    ab_split_percent.set(float(split_percent))
-    return {"split_percent": split_percent}
+    try:
+        split_percent = int(body.split_percent)
+        request.app.state.ab_split_percent = split_percent
+        ab_split_percent.set(float(split_percent))
+        return {"split_percent": split_percent}
+    except Exception as e:
+        logger.exception("split_update_failed")
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.get("/history")

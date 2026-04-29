@@ -12,6 +12,7 @@ import Sidebar from "@/components/Sidebar";
 
 const inter = Inter({ subsets: ["latin"] });
 
+/** Root layout with sidebar + top navbar, theme provider, and React Query provider. */
 export default function RootLayout({
   children
 }: Readonly<{

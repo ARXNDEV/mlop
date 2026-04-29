@@ -21,9 +21,22 @@ export type ABHistoryPoint = { hour: string; count: number };
 
 export type ABHistory = { v1: ABHistoryPoint[]; v2: ABHistoryPoint[] };
 
-export type DriftPoint = { time: string; drift_score: number };
+export type DriftPoint = { timestamp: number; drift_score: number };
 
-export type MlflowRun = {
+export type DriftFeature = {
+  feature: string;
+  psi: number;
+  drift_detected: boolean;
+  trend: number[];
+};
+
+export type RetrainEvent = {
+  timestamp: number;
+  reason: string;
+  run_id: string | null;
+};
+
+export type Experiment = {
   run_id: string;
   start_time: number;
   status: string;

@@ -1,3 +1,6 @@
+"""Drift detection utilities using Evidently when available, with PSI-based fallback."""
+
+import logging
 import math
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +12,8 @@ import pandas as pd
 from ml.train import generate_dataset
 
 
+logger = logging.getLogger(__name__)
+
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 
 
@@ -16,7 +21,7 @@ def load_reference_data() -> pd.DataFrame:
     data_path = Path(__file__).resolve().parent / "data" / "reference.csv"
     if data_path.exists():
         return pd.read_csv(data_path)
-    return generate_dataset(n_samples=5000, random_state=42)
+    raise FileNotFoundError(str(data_path))
 
 
 def load_current_data(batch_path: Union[str, Path]) -> pd.DataFrame:
@@ -49,19 +54,44 @@ def _extract_drift_summary(report_dict: dict[str, Any]) -> tuple[float, list[str
 
 
 def run_drift_report(reference_df: pd.DataFrame, current_df: pd.DataFrame) -> dict[str, Any]:
-    from evidently.metric_preset import DataDriftPreset, DataQualityPreset
-    from evidently.report import Report
-
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    report = Report(metrics=[DataDriftPreset(), DataQualityPreset()])
-    report.run(reference_data=reference_df, current_data=current_df)
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_path = REPORTS_DIR / f"drift_{ts}.html"
-    report.save_html(str(out_path))
+    try:
+        from evidently.metric_preset import DataDriftPreset, DataQualityPreset
+        from evidently.report import Report
 
-    d = report.as_dict()
-    drift_score, drifted_features, share_drifted = _extract_drift_summary(d)
+        report = Report(metrics=[DataDriftPreset(), DataQualityPreset()])
+        report.run(reference_data=reference_df, current_data=current_df)
+        report.save_html(str(out_path))
+
+        d = report.as_dict()
+        drift_score, drifted_features, share_drifted = _extract_drift_summary(d)
+    except Exception as e:
+        logger.warning("evidently_unavailable_falling_back", extra={"error": str(e)})
+        drifted_features = []
+        psi_scores: list[float] = []
+        for col in [c for c in reference_df.columns if c != "target"]:
+            if col not in current_df.columns:
+                continue
+            psi = get_psi_score(reference_df[col], current_df[col])
+            psi_scores.append(psi)
+            if psi >= 0.2:
+                drifted_features.append(col)
+
+        share_drifted = float(len(drifted_features) / max(len(psi_scores), 1))
+        drift_score = float(np.mean(psi_scores)) if psi_scores else 0.0
+        html = (
+            "<html><head><title>Drift report</title></head><body>"
+            f"<h2>Fallback drift report ({ts})</h2>"
+            f"<div>drift_score: {drift_score:.6f}</div>"
+            f"<div>share_drifted: {share_drifted:.6f}</div>"
+            f"<div>drifted_features: {', '.join(drifted_features) if drifted_features else 'none'}</div>"
+            "</body></html>"
+        )
+        out_path.write_text(html, encoding="utf-8")
+
     return {
         "drift_score": float(drift_score),
         "drifted_features": drifted_features,
@@ -102,7 +132,8 @@ def get_psi_score(reference_series: pd.Series, current_series: pd.Series, bins: 
         return 0.0
 
     quantiles = np.linspace(0.0, 1.0, bins + 1)
-    cuts = np.quantile(ref, quantiles)
+    combined = np.concatenate([ref, cur], axis=0)
+    cuts = np.quantile(combined, quantiles)
     cuts = np.unique(cuts)
     if cuts.size < 3:
         return 0.0

@@ -1,3 +1,6 @@
+"""Model training script for the mlops-platform synthetic classification model."""
+
+import logging
 import argparse
 import os
 from dataclasses import asdict, dataclass
@@ -20,6 +23,8 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 
+
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TrainMetrics:

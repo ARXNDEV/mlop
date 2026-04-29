@@ -1,3 +1,6 @@
+"""Model evaluation utilities for production/staged MLflow runs."""
+
+import logging
 import argparse
 import json
 import os
@@ -19,6 +22,8 @@ from sklearn.metrics import (
 from ml.model_registry import get_production_model
 from ml.train import generate_dataset, split_dataset
 
+
+logger = logging.getLogger(__name__)
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     v = os.getenv(name)
