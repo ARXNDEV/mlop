@@ -1,0 +1,55 @@
+{
+  "uid": "mlops-abtest",
+  "title": "A/B Test",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Prediction request rate by model_version",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(prediction_requests_total[5m])) by (model_version)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2 },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "A/B split percent (to v2)",
+      "gridPos": { "x": 0, "y": 9, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ab_split_percent"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "decimals": 0 },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Prediction confidence (p50 via histogram_quantile)",
+      "gridPos": { "x": 8, "y": 9, "w": 16, "h": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum(rate(prediction_confidence_bucket[5m])) by (le, model_version))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 3, "min": 0, "max": 1 },
+        "overrides": []
+      }
+    }
+  ]
+}

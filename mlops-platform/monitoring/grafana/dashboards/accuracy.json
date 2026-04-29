@@ -1,0 +1,40 @@
+{
+  "uid": "mlops-accuracy",
+  "title": "Model Accuracy",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "model_accuracy gauge",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "model_accuracy"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 4, "min": 0, "max": 1 },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "prediction_requests_total (rate)",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(prediction_requests_total[5m])) by (model_version)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2 },
+        "overrides": []
+      }
+    }
+  ]
+}

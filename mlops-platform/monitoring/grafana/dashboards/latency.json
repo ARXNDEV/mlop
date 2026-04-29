@@ -1,0 +1,40 @@
+{
+  "uid": "mlops-latency",
+  "title": "API Latency",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "P95 HTTP latency (ms)",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_ms_bucket[5m])) by (le))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "decimals": 2 },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP request rate (req/s)",
+      "gridPos": { "x": 0, "y": 9, "w": 24, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_requests_total[5m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2 },
+        "overrides": []
+      }
+    }
+  ]
+}
