@@ -166,6 +166,20 @@ def train_and_log(
         return run.info.run_id
 
 
+def train() -> str:
+    run_id = train_and_log(n_estimators=200, max_depth=None, min_samples_split=2)
+    try:
+        from ml.model_registry import promote_to_production, promote_to_staging, register_model
+
+        model_name = _env("MODEL_NAME", "income-classifier") or "income-classifier"
+        version = register_model(run_id, model_name=model_name)
+        promote_to_staging(model_name=model_name, version=version)
+        promote_to_production(model_name=model_name, version=version)
+    except Exception as e:
+        logger.warning("model_registry_seed_failed", extra={"error": str(e)})
+    return run_id
+
+
 def _print_summary(metrics: TrainMetrics, run_id: str) -> None:
     rows: list[tuple[str, Any]] = [
         ("run_id", run_id),
