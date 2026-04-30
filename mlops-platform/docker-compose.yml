@@ -94,7 +94,7 @@ services:
           --firstname Admin \
           --lastname User \
           --role Admin \
-          --email admin@example.com
+          --email admin@example.com || true
     depends_on:
       postgres:
         condition: service_healthy
