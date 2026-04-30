@@ -83,8 +83,8 @@ services:
   airflow-init:
     build: ./airflow
     env_file: .env
+    entrypoint: /bin/bash
     command:
-      - /bin/bash
       - -lc
       - |
         airflow db init
