@@ -52,7 +52,7 @@ services:
       - mlops-network
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.11.1
+    build: ./mlflow
     env_file: .env
     command:
       - mlflow
