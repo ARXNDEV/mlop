@@ -54,7 +54,7 @@ open http://localhost:3000
 |--------:|-----|
 | Dashboard | http://localhost:3000 |
 | API | http://localhost:8000 |
-| MLflow | http://localhost:5000 |
+| MLflow | http://localhost:5001 |
 | Airflow | http://localhost:8080 |
 | Grafana | http://localhost:3001 |
 | Prometheus | http://localhost:9090 |
